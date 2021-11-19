@@ -251,8 +251,8 @@ while(True):
         else:
             error("Keystore is empty")
     elif choice=='5':
-        keystore={}
-        success("All clear")
+        #keystore={}
+        error("This option is deprecated.")
     elif choice=='6':
         s=encrypt(getdata("Site : "))
         if s in keystore:

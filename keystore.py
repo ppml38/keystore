@@ -17,16 +17,17 @@ import re
 class table:
     def __init__(self,header):
         self.header = list(map(str,header))
-        self.lengths = list(map(len,header))
+        #self.lengths = list(map(len,header))
+        self.max_length = 30
+        self.lengths = []
+        for h in header:
+            self.lengths.append(min(self.max_length,len(h)))
         self.rows=[]
-        self.max_length = None
         self.title = None
     def add_row(self,row):
-        if self.max_length!=None:
-            row = list(map(lambda x:x[:self.max_length],row))
         self.rows.append(row)
         for i in range(len(row)):
-            self.lengths[i] = max(self.lengths[i],len(row[i]))
+            self.lengths[i] = min(self.max_length, max(self.lengths[i],len(row[i])))
     def add_title(self,title):
         self.title = title
     def print_header(self):
@@ -34,11 +35,25 @@ class table:
         for i in range(len(self.header)):
             string+=f"|{bcolors.OKCYAN}{self.header[i]:^{self.lengths[i]}}{bcolors.ENDC}"
         print(string+"|")
+    def get_chunks(self,x):
+        chunks, chunk_size = len(x), self.max_length
+        return [ x[i:i+chunk_size] for i in range(0, chunks, chunk_size) ]
     def print_row(self,row):
-        string=''
-        for i in range(len(row)):
-            string+=f"|{row[i]:^{self.lengths[i]}}"
-        print(string+"|")
+        #rows=[[] for i in range(len(row)]
+        rows=[]
+        max_height=0
+        for field in row:
+            rows.append(self.get_chunks(field))
+            max_height=max(max_height,len(rows[-1]))
+        for i in range(max_height):
+            string=''
+            for j in range(len(row)):
+                text = rows[j][i] if i<len(rows[j]) else ""
+                if i>0:
+                    string+=f"|{text:<{self.lengths[j]}}"
+                else:
+                    string+=f"|{text:^{self.lengths[j]}}"
+            print(string+"|")
     def print_line(self):
         line=''
         for i in range(len(self.header)):
@@ -336,7 +351,7 @@ while(True):
                 choice=int(getdata(prompt="Choose a site(1-"+str(len(keystore))+") to view OR Press 'Enter/Return' to continue :"))
                 show_a_site(choice)
             except Exception as e:
-                pass
+                raise e
         else:
             error("Keystore is empty")
     elif choice=='5':
@@ -416,7 +431,6 @@ while(True):
     elif choice=='7':
         if keystore:
             t=table(["Site Name","Field","Value"])
-            t.max_length = 30
             for s in keystore:
                 #print(decrypt(s))
                 t.add_row([decrypt(s),"",""])

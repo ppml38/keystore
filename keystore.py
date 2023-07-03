@@ -14,6 +14,54 @@ import string
 import random
 import re
 
+class table:
+    def __init__(self,header):
+        self.header = list(map(str,header))
+        self.lengths = list(map(len,header))
+        self.rows=[]
+        self.max_length = None
+        self.title = None
+    def add_row(self,row):
+        if self.max_length!=None:
+            row = list(map(lambda x:x[:self.max_length],row))
+        self.rows.append(row)
+        for i in range(len(row)):
+            self.lengths[i] = max(self.lengths[i],len(row[i]))
+    def add_title(self,title):
+        self.title = title
+    def print_header(self):
+        string=''
+        for i in range(len(self.header)):
+            string+=f"|{bcolors.OKCYAN}{self.header[i]:^{self.lengths[i]}}{bcolors.ENDC}"
+        print(string+"|")
+    def print_row(self,row):
+        string=''
+        for i in range(len(row)):
+            string+=f"|{row[i]:^{self.lengths[i]}}"
+        print(string+"|")
+    def print_line(self):
+        line=''
+        for i in range(len(self.header)):
+            line+=f"+{'-'*self.lengths[i]}"
+        print(line+"+")
+    def print_title(self):
+        if self.title==None:
+            return
+        total_length = sum(self.lengths)
+        total_length+=(len(self.header)-1)
+        self.print_line()
+        print(f"|{bcolors.OKGREEN}{self.title:^{total_length}}{bcolors.ENDC}|")
+    def print(self):
+        if len(self.rows)==0:
+            return False
+        self.print_title()
+        self.print_line()
+        self.print_header()
+        self.print_line()
+        for row in self.rows:
+            self.print_row(row)
+            self.print_line()
+        return True
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -26,7 +74,7 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 hdr="----------------\n"+bcolors.OKGREEN+"K E Y  S T O R E"+bcolors.ENDC+"\n----------------"
-menu=["Store new site","Seek a site","Delete a site","List all sites","Delete all sites","Edit a site","Reveal All sites","Save","SAVE and "+bcolors.FAIL+"EXIT"+bcolors.ENDC,"Dont save and EXIT","Export plain data","Change master password","Change welcome phrase\n\n"]
+menu=["Store new site","Search","Delete a site","List all sites","Delete all sites","Edit a site","Reveal All sites","Save","SAVE and "+bcolors.FAIL+"EXIT"+bcolors.ENDC,"Dont save and EXIT","Export plain data","Change master password","Change welcome phrase\n\n"]
 masterfilename="master.pwd"
 
 os.system('cls')
@@ -128,6 +176,45 @@ def save():
         master={"wp":welcomephrase,"ks":keystore}
         f.write(json.dumps(master))
 
+def choose_a_site():
+    if keystore:
+        count=1
+        for s in keystore:
+            print(str(count)+'.'+decrypt(s))
+            count+=1
+        try:
+            choice=int(getdata(prompt="Choose a site(1-"+str(len(keystore))+") to view OR Press 'Enter/Return' to continue :"))
+            c=1
+            for sitename in keystore:
+                if c==choice:
+                    return sitename
+                else:
+                    c+=1
+            return None
+        except Exception as e:
+            return None
+    else:
+        error("Keystore is empty")
+        return None
+def show_a_site(option_number):
+    c=1
+    for i in keystore:
+        if c==option_number:
+            t=table(["Field","Value"])
+            t.add_title(decrypt(i))
+            all=keystore[i]
+            for i in all:
+                for j in i:
+                    #print(decrypt(j)+"\t"+decrypt(i[j]))
+                    t.add_row([decrypt(j),decrypt(i[j])])
+                #print("\n")
+            t.print()
+            break
+        else:
+            c+=1
+    else:
+        error("Invalid option number")
+
 lines=''
 try:
     if os.path.isfile(masterfilename):
@@ -176,6 +263,8 @@ while(True):
             p=encrypt(getdata("Password : "))
         if s in keystore:
             keystore[s].append({encrypt("Username/Email"):u,encrypt("Password"):p})
+            error("Site name already exists.")
+            success("Above username and password are appended to it.")
         else:
             keystore[s]=[{encrypt("Username/Email"):u,encrypt("Password"):p}]
         while True:
@@ -189,43 +278,54 @@ while(True):
             keystore[s][-1][f]=v
         success("Done")
     elif choice=='2':
-        try:
-            s=encrypt(getdata("Site :"))
-            if s in keystore:
-                for i in keystore[s]:
+        search_term = getdata("Search Term :")
+        if keystore:
+            t=table(["Site Name","Field","Value"])
+            for site in keystore:
+                siteName = decrypt(site)
+                for i in keystore[site]:
                     for j in i:
-                        print(decrypt(j)+"\t"+decrypt(i[j]))
-                    print("\n")
-            else:
-                error("No such site present in keystore")
-        except:
-            error("Error retrieving key")
-    elif choice=='3':
-        s=encrypt(getdata("Site : "))
-        if s in keystore:
-            if len(keystore[s])>1:
-                c=1
-                for i in keystore[s]:
-                    print("("+str(c)+")")
-                    for j in i:
-                        print(decrypt(j)+"\t"+decrypt(i[j]))
-                    c+=1
-                n=getdata(prompt="Please select the record to delete (1-"+str(len(keystore[s]))+") or enter 'A' to delete all records: ",regex="a|A|\d+\Z",message="Invalid option")
-                if n in ['a','A']:
-                    del keystore[s]
-                else:
-                    try:
-                        n=int(n)
-                        if n>0 and n<=len(keystore[s]):
-                            del keystore[s][n-1]
-                            print("Record no."+str(n)+" Deleted")
-                    except ValueError:
-                        error("Please enter valid option")
-            else:
-                del keystore[s]
-                success("Deleted")
+                        var = decrypt(j)
+                        val = decrypt(i[j])
+                        if var.lower().find(search_term)!=-1 or val.lower().find(search_term)!=-1 or siteName.lower().find(search_term)!=-1:
+                            #print(siteName+">>\t"+var+":\t"+val)
+                            t.add_row([siteName,var,val])
+            if not t.print():
+                error("Search result empty")
         else:
-            error(decrypt(s)+" not found")
+            error("Keystore is empty")
+    elif choice=='3':
+        site_input = choose_a_site()
+        if site_input==None:
+            error("No site deleted")
+        elif confirm("Is the site name '%s' correct ? (y/n):"%decrypt(site_input)) and confirm("Are you sure to delete '%s' ? (y/n):"%decrypt(site_input)):
+            s=site_input
+            if s in keystore:
+                if len(keystore[s])>1:
+                    c=1
+                    for i in keystore[s]:
+                        print("("+str(c)+")")
+                        for j in i:
+                            print(decrypt(j)+"\t"+decrypt(i[j]))
+                        c+=1
+                    n=getdata(prompt="Please select the record to delete (1-"+str(len(keystore[s]))+") or enter 'A' to delete all records: ",regex="a|A|\d+\Z",message="Invalid option")
+                    if n in ['a','A']:
+                        del keystore[s]
+                    else:
+                        try:
+                            n=int(n)
+                            if n>0 and n<=len(keystore[s]):
+                                del keystore[s][n-1]
+                                print("Record no."+str(n)+" Deleted")
+                        except ValueError:
+                            error("Please enter valid option")
+                else:
+                    del keystore[s]
+                    success("Deleted")
+            else:
+                error(decrypt(s)+" not found")
+        else:
+            error("No site deleted.")
     elif choice=='4':
         if keystore:
             count=1
@@ -234,18 +334,7 @@ while(True):
                 count+=1
             try:
                 choice=int(getdata(prompt="Choose a site(1-"+str(len(keystore))+") to view OR Press 'Enter/Return' to continue :"))
-                c=1
-                for i in keystore:
-                    if c==choice:
-                        print(decrypt(i))
-                        all=keystore[i]
-                        for i in all:
-                            for j in i:
-                                print(decrypt(j)+"\t"+decrypt(i[j]))
-                            print("\n")
-                        break
-                    else:
-                        c+=1
+                show_a_site(choice)
             except Exception as e:
                 pass
         else:
@@ -254,78 +343,89 @@ while(True):
         #keystore={}
         error("This option is deprecated.")
     elif choice=='6':
-        s=encrypt(getdata("Site : "))
-        if s in keystore:
-            if len(keystore[s])>1:
-                c=1
-                for i in keystore[s]:
-                    print("("+str(c)+")")
-                    for j in i:
-                        print(decrypt(j)+"\t"+decrypt(i[j]))
-                    c+=1
-                n=getdata(prompt="Please select the record to Edit (1-"+str(len(keystore[s]))+"): ",regex="\d+\Z")
-            else:
-                n=1        
-            try:
-                n=int(n)
-                if n>0 and n<=len(keystore[s]):
-                    option=showmenu(options=["Add a field","Edit existing field","Delete a field"],header="What you want to do?")
-                    if option=='1':
-                        f=encrypt(getdata("Field : "))
-                        if f in keystore[s][n-1]:
-                            error("This field already exists!")
-                        else:
-                            v=encrypt(getdata("Value: "))
-                            keystore[s][n-1][f]=v
-                            success("New field added")
-                    elif option=='2':
-                        #print("\n")
-                        #opts=[]
-                        #for i in keystore[s][n-1]:
-                            #print(str(cu)+"."+decrypt(i))
-                            #opts.append(decrypt(i))
-                            #cu+=1
-                        f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Please select the field to Edit (1-"+str(len(keystore[s][n-1]))+")?")
-                        try:
-                            f=int(f)
-                            if f>0 and f<=len(keystore[s][n-1]):
-                                keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": "))
-                                success("Updated")
+        site_input = choose_a_site()
+        if site_input==None:
+            error("No site deleted")
+        elif confirm("Is the site name '%s' correct ? (y/n):"%decrypt(site_input)):
+            s=site_input
+            if s in keystore:
+                if len(keystore[s])>1:
+                    c=1
+                    for i in keystore[s]:
+                        print("("+str(c)+")")
+                        for j in i:
+                            print(decrypt(j)+"\t"+decrypt(i[j]))
+                        c+=1
+                    n=getdata(prompt="Please select the record to Edit (1-"+str(len(keystore[s]))+"): ",regex="\d+\Z")
+                else:
+                    n=1        
+                try:
+                    n=int(n)
+                    if n>0 and n<=len(keystore[s]):
+                        option=showmenu(options=["Add a field","Edit existing field","Delete a field"],header="What you want to do?")
+                        if option=='1':
+                            f=encrypt(getdata("Field : "))
+                            if f in keystore[s][n-1]:
+                                error("This field already exists!")
                             else:
+                                v=encrypt(getdata("Value: "))
+                                keystore[s][n-1][f]=v
+                                success("New field added")
+                        elif option=='2':
+                            #print("\n")
+                            #opts=[]
+                            #for i in keystore[s][n-1]:
+                                #print(str(cu)+"."+decrypt(i))
+                                #opts.append(decrypt(i))
+                                #cu+=1
+                            f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Please select the field to Edit (1-"+str(len(keystore[s][n-1]))+")?")
+                            try:
+                                f=int(f)
+                                if f>0 and f<=len(keystore[s][n-1]):
+                                    keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": "))
+                                    success("Updated")
+                                else:
+                                    error("Invalid option")
+                            except ValueError:
                                 error("Invalid option")
-                        except ValueError:
-                            error("Invalid option")
 
-                    elif option=='3':
-                        #opts=[]
-                        #for i in keystore[s][n-1]:
-                            #print(str(cu)+"."+decrypt(i))
-                            #opts.append(decrypt(i))
-                        f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Which field you want to Delete (1-"+str(len(keystore[s][n-1]))+")?")
-                        try:
-                            f=int(f)
-                            if f>0 and f<=len(keystore[s][n-1]):
-                                del keystore[s][n-1][list(keystore[s][n-1])[f-1]]
-                                success("Deleted")
-                            else:
+                        elif option=='3':
+                            #opts=[]
+                            #for i in keystore[s][n-1]:
+                                #print(str(cu)+"."+decrypt(i))
+                                #opts.append(decrypt(i))
+                            f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Which field you want to Delete (1-"+str(len(keystore[s][n-1]))+")?")
+                            try:
+                                f=int(f)
+                                if f>0 and f<=len(keystore[s][n-1]):
+                                    del keystore[s][n-1][list(keystore[s][n-1])[f-1]]
+                                    success("Deleted")
+                                else:
+                                    error("Invalid option")
+                            except ValueError:
                                 error("Invalid option")
-                        except ValueError:
+                        else:
                             error("Invalid option")
-                    else:
-                        error("Invalid option")
-                    
-            except ValueError:
-                error("Please enter valid option")
+                        
+                except ValueError:
+                    error("Please enter valid option")
+            else:
+                error(decrypt(s)+" not found")
         else:
-            error(decrypt(s)+" not found")
+            error("No site edited")
     elif choice=='7':
         if keystore:
+            t=table(["Site Name","Field","Value"])
+            t.max_length = 30
             for s in keystore:
-                print(decrypt(s))
+                #print(decrypt(s))
+                t.add_row([decrypt(s),"",""])
                 for i in keystore[s]:
                     for j in i:
-                        print("\t"+decrypt(j)+"\t"+decrypt(i[j]))
-                    print("\n")
+                        #print("\t"+decrypt(j)+"\t"+decrypt(i[j]))
+                        t.add_row(["",decrypt(j),decrypt(i[j])])
+                    #print("\n")
+            t.print()
         else:
             error("Keystore is empty")
     elif choice=='8':

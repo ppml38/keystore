@@ -202,15 +202,17 @@ def choose_a_site():
             c=1
             for sitename in keystore:
                 if c==choice:
-                    return sitename
+                    return {'sitename':sitename,'option':choice}
                 else:
                     c+=1
-            return None
+            return {'sitename':None,'option':None}
+        except ValueError as e:
+            return {'sitename':None,'option':None}
         except Exception as e:
-            return None
+            raise e
     else:
         error("Keystore is empty")
-        return None
+        return {'sitename':None,'option':None}
 def show_a_site(option_number):
     c=1
     for i in keystore:
@@ -310,7 +312,7 @@ while(True):
         else:
             error("Keystore is empty")
     elif choice=='3':
-        site_input = choose_a_site()
+        site_input = choose_a_site()['sitename']
         if site_input==None:
             error("No site deleted")
         elif confirm("Is the site name '%s' correct ? (y/n):"%decrypt(site_input)) and confirm("Are you sure to delete '%s' ? (y/n):"%decrypt(site_input)):
@@ -343,24 +345,18 @@ while(True):
             error("No site deleted.")
     elif choice=='4':
         if keystore:
-            count=1
-            for s in keystore:
-                print(str(count)+'.'+decrypt(s))
-                count+=1
-            try:
-                choice=int(getdata(prompt="Choose a site(1-"+str(len(keystore))+") to view OR Press 'Enter/Return' to continue :"))
+            choice = choose_a_site()['option']
+            if choice!=None:
                 show_a_site(choice)
-            except Exception as e:
-                raise e
         else:
             error("Keystore is empty")
     elif choice=='5':
         #keystore={}
         error("This option is deprecated.")
     elif choice=='6':
-        site_input = choose_a_site()
+        site_input = choose_a_site()['sitename']
         if site_input==None:
-            error("No site deleted")
+            error("No site edited")
         elif confirm("Is the site name '%s' correct ? (y/n):"%decrypt(site_input)):
             s=site_input
             if s in keystore:

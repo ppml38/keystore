@@ -25,6 +25,7 @@ class table:
         self.rows=[]
         self.title = None
     def add_row(self,row):
+        row = list(map(str,row))
         self.rows.append(row)
         for i in range(len(row)):
             self.lengths[i] = min(self.max_length, max(self.lengths[i],len(row[i])))
@@ -158,9 +159,9 @@ def getdata(prompt=">>",regex=None,default=None,message="Invalid option"):
 def confirm(prompt="(y/n):"):
     while True:
         choice=input(bcolors.OKCYAN+prompt+bcolors.ENDC)
-        if choice in ['y','Y','Yes','YES','yes','yeah','Yeah','YEAH','ya','Ya','YA','yep','Yep','YEP']:
+        if choice.lower() in ['y','yes','yeah','ya','yep']: #['y','Y','Yes','YES','yes','yeah','Yeah','YEAH','ya','Ya','YA','yep','Yep','YEP']:
             return True
-        elif choice in ['n','N','no','No','NO','Nope','nope','NOPE']:
+        elif choice.lower() in ['n','no','nope']: #['n','N','no','No','NO','Nope','nope','NOPE']:
             return False
         else:
             error("Invalid option")
@@ -214,17 +215,23 @@ def choose_a_site():
         error("Keystore is empty")
         return {'sitename':None,'option':None}
 def show_a_site(option_number):
+    if option_number==None:
+        return
     c=1
     for i in keystore:
         if c==option_number:
-            t=table(["Field","Value"])
+            t=table(["S.No","Field","Value"])
             t.add_title(decrypt(i))
-            all=keystore[i]
-            for i in all:
-                for j in i:
-                    #print(decrypt(j)+"\t"+decrypt(i[j]))
-                    t.add_row([decrypt(j),decrypt(i[j])])
-                #print("\n")
+            all_records=keystore[i] #a site can have multiple records, ex. having multiple twitter accounts
+            for index in range(len(all_records)):
+                record = all_records[index]
+                first_field = True
+                for field in record:
+                    if first_field:
+                        t.add_row([index+1,decrypt(field),decrypt(record[field])])
+                        first_field=False
+                    else:
+                        t.add_row(["",decrypt(field),decrypt(record[field])])
             t.print()
             break
         else:
@@ -271,29 +278,57 @@ while(True):
     print(hdr)
     choice=showmenu(menu)
     if choice=='1':
-        s=encrypt(getdata("Site : "))
-        u=encrypt(getdata("Username/email : "))
-        if confirm("Do you want keystore to generate a secure password for you? (y/n):"):
-            p=encrypt(generatepwd(request=True))
-            print("Password generated and stored.")
+        selection=showmenu(options=["Create new site","Add new account to existing site"],header="What you want to do?")
+        if selection=='1':
+            s=encrypt(getdata("Site : "))
+            u=encrypt(getdata("Username/email : "))
+            if confirm("Do you want keystore to generate a secure password for you? (y/n):"):
+                p=encrypt(generatepwd(request=True))
+                print("Password generated and stored.")
+            else:
+                p=encrypt(getdata("Password : "))
+            if s in keystore:
+                keystore[s].append({encrypt("Username/Email"):u,encrypt("Password"):p})
+                error("Site name already exists.")
+                success("Above username and password are appended to it.")
+            else:
+                keystore[s]=[{encrypt("Username/Email"):u,encrypt("Password"):p}]
+            while True:
+                if not confirm("Do you want to store any more data with this site (y/n) ?"):
+                    break
+                f=encrypt(getdata("Field : "))
+                if f in keystore[s][-1]:
+                    error("This field already exists!")
+                    continue
+                v=encrypt(getdata("Value: "))
+                keystore[s][-1][f]=v
+            success("Done")
+        elif selection=='2':
+            s = choose_a_site()['sitename']
+            print("Please provide details of new account/record, to store.")
+            u=encrypt(getdata("Username/email : "))
+            if confirm("Do you want keystore to generate a secure password for you? (y/n):"):
+                p=encrypt(generatepwd(request=True))
+                print("Password generated and stored.")
+            else:
+                p=encrypt(getdata("Password : "))
+            if s in keystore:
+                keystore[s].append({encrypt("Username/Email"):u,encrypt("Password"):p})
+            else:
+                success("No existing site found. Added as a new site instead.")
+                keystore[s]=[{encrypt("Username/Email"):u,encrypt("Password"):p}]
+            while True:
+                if not confirm("Do you want to store any more data with this site (y/n) ?"):
+                    break
+                f=encrypt(getdata("Field : "))
+                if f in keystore[s][-1]:
+                    error("This field already exists!")
+                    continue
+                v=encrypt(getdata("Value: "))
+                keystore[s][-1][f]=v
+            success("Done")
         else:
-            p=encrypt(getdata("Password : "))
-        if s in keystore:
-            keystore[s].append({encrypt("Username/Email"):u,encrypt("Password"):p})
-            error("Site name already exists.")
-            success("Above username and password are appended to it.")
-        else:
-            keystore[s]=[{encrypt("Username/Email"):u,encrypt("Password"):p}]
-        while True:
-            if not confirm("Do you want to store any more data with this site (y/n) ?"):
-                break
-            f=encrypt(getdata("Field : "))
-            if f in keystore[s][-1]:
-                error("This field already exists!")
-                continue
-            v=encrypt(getdata("Value: "))
-            keystore[s][-1][f]=v
-        success("Done")
+            error("Invalid option")
     elif choice=='2':
         search_term = getdata("Search Term :")
         if keystore:
@@ -312,11 +347,12 @@ while(True):
         else:
             error("Keystore is empty")
     elif choice=='3':
-        site_input = choose_a_site()['sitename']
-        if site_input==None:
+        site_input = choose_a_site()
+        show_a_site(site_input['option'])
+        if site_input['sitename']==None:
             error("No site deleted")
-        elif confirm("Is the site name '%s' correct ? (y/n):"%decrypt(site_input)) and confirm("Are you sure to delete '%s' ? (y/n):"%decrypt(site_input)):
-            s=site_input
+        elif confirm("Is this the site you want to delete ? (y/n):") and confirm("Are you sure to delete '%s' ? (y/n):"%decrypt(site_input['sitename'])):
+            s=site_input['sitename']
             if s in keystore:
                 if len(keystore[s])>1:
                     c=1
@@ -354,11 +390,12 @@ while(True):
         #keystore={}
         error("This option is deprecated.")
     elif choice=='6':
-        site_input = choose_a_site()['sitename']
-        if site_input==None:
+        site_input = choose_a_site()
+        show_a_site(site_input['option'])
+        if site_input['sitename']==None:
             error("No site edited")
-        elif confirm("Is the site name '%s' correct ? (y/n):"%decrypt(site_input)):
-            s=site_input
+        elif confirm("Is this the site you want to edit ? (y/n):"):
+            s=site_input['sitename']
             if s in keystore:
                 if len(keystore[s])>1:
                     c=1
@@ -393,8 +430,12 @@ while(True):
                             try:
                                 f=int(f)
                                 if f>0 and f<=len(keystore[s][n-1]):
-                                    keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": "))
-                                    success("Updated")
+                                    print("Old value for %s:%s"%(decrypt(list(keystore[s][n-1])[f-1]), decrypt(keystore[s][n-1][list(keystore[s][n-1])[f-1]])))
+                                    if confirm("Are you sure to edit ? (y/n):"):
+                                        keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": "))
+                                        success("Updated")
+                                    else:
+                                        error("Not edited")
                                 else:
                                     error("Invalid option")
                             except ValueError:
@@ -409,8 +450,11 @@ while(True):
                             try:
                                 f=int(f)
                                 if f>0 and f<=len(keystore[s][n-1]):
-                                    del keystore[s][n-1][list(keystore[s][n-1])[f-1]]
-                                    success("Deleted")
+                                    if confirm("Are you sure to delete? (y/n):"):
+                                        del keystore[s][n-1][list(keystore[s][n-1])[f-1]]
+                                        success("Deleted")
+                                    else:
+                                        error("Nothing deleted")
                                 else:
                                     error("Invalid option")
                             except ValueError:

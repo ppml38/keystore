@@ -36,8 +36,9 @@ class table:
         for i in range(len(self.header)):
             string+=f"|{bcolors.OKCYAN}{self.header[i]:^{self.lengths[i]}}{bcolors.ENDC}"
         print(string+"|")
-    def get_chunks(self,x):
-        chunks, chunk_size = len(x), self.max_length
+    def get_chunks(self,x,max_length=None):
+        max_length = max_length or self.max_length
+        chunks, chunk_size = len(x), max_length
         return [ x[i:i+chunk_size] for i in range(0, chunks, chunk_size) ]
     def print_row(self,row):
         #rows=[[] for i in range(len(row)]
@@ -66,7 +67,9 @@ class table:
         total_length = sum(self.lengths)
         total_length+=(len(self.header)-1)
         self.print_line()
-        print(f"|{bcolors.OKGREEN}{self.title:^{total_length}}{bcolors.ENDC}|")
+        chunks=self.get_chunks(self.title,total_length)
+        for chunk in chunks:
+            print(f"|{bcolors.OKGREEN}{chunk:^{total_length}}{bcolors.ENDC}|")
     def print(self):
         if len(self.rows)==0:
             return False
@@ -470,16 +473,9 @@ while(True):
             error("No site edited")
     elif choice=='7':
         if keystore:
-            t=table(["Site Name","Field","Value"])
-            for s in keystore:
-                #print(decrypt(s))
-                t.add_row([decrypt(s),"",""])
-                for i in keystore[s]:
-                    for j in i:
-                        #print("\t"+decrypt(j)+"\t"+decrypt(i[j]))
-                        t.add_row(["",decrypt(j),decrypt(i[j])])
-                    #print("\n")
-            t.print()
+            for i in range(len(keystore)):
+                print("(%s)"%(i+1))
+                show_a_site(i+1)
         else:
             error("Keystore is empty")
     elif choice=='8':

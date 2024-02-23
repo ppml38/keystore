@@ -13,6 +13,11 @@ import os
 import string
 import random
 import re
+import aes
+import base64
+import hashlib
+import shutil
+import time
 
 class table:
     def __init__(self,header):
@@ -93,7 +98,20 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 hdr="----------------\n"+bcolors.OKGREEN+"K E Y  S T O R E"+bcolors.ENDC+"\n----------------"
-menu=["Store new site","Search","Delete a site","List all sites","Delete all sites","Edit a site","Reveal All sites","Save","SAVE and "+bcolors.FAIL+"EXIT"+bcolors.ENDC,"Dont save and EXIT","Export plain data","Change master password","Change welcome phrase\n\n"]
+menu=[
+    "Store new site",
+    "Search",
+    "Delete a site",
+    "List all sites",
+    "Delete all sites",
+    "Edit a site",
+    "Reveal All sites",
+    "Save",
+    bcolors.FAIL+"EXIT"+bcolors.ENDC,
+    "Export plain data",
+    "Change master password",
+    "Change welcome phrase\n\n"
+    ]
 masterfilename="master.pwd"
 
 os.system('cls')
@@ -169,15 +187,15 @@ def confirm(prompt="(y/n):"):
         else:
             error("Invalid option")
 
-
 def decrypt(cipher,pwd=None):
     if pwd==None:
         pwd=masterpassword
     if pwd=='': #If password is empty data handled in plain. no encryption or decryption
         return cipher
+    cipher = base64.b64decode(cipher,b"-_")
     plain=[]
-    for i in range(len(cipher)):
-        plain.append(int.from_bytes(cipher[i].encode('utf-8'),byteorder='big')^int.from_bytes(pwd[i%len(pwd)].encode('utf-8'),byteorder='big'))
+    for i in range(len(cipher)): #looping through bytes already fetches int
+        plain.append(cipher[i]^int.from_bytes(pwd[i%len(pwd)].encode('utf-8'),byteorder='big'))
     return bytes(plain).decode('utf-8')
 
 def encrypt(plain,pwd=None):
@@ -188,12 +206,70 @@ def encrypt(plain,pwd=None):
     cipher=[]
     for i in range(len(plain)):
         cipher.append(int.from_bytes(plain[i].encode('utf-8'),byteorder='big')^int.from_bytes(pwd[i%len(pwd)].encode('utf-8'),byteorder='big'))
-    return bytes(cipher).decode('utf-8')
+    return base64.b64encode(bytes(cipher),b"-_").decode('utf-8')
 
-def save():
-    with open(masterfilename,'w') as f:
-        master={"wp":welcomephrase,"ks":keystore}
-        f.write(json.dumps(master))
+def digest(string):
+    return hashlib.sha256(("%s%s"%(string,masterpassword)).encode()).hexdigest()
+
+def hashit(string):
+    return "%s.%s"%(string,digest(string))
+
+def unhashit(hashed_string):
+    try:
+        string,hash = hashed_string.split(".")
+        if hashlib.sha256(("%s%s"%(string,masterpassword)).encode()).hexdigest() == hash:
+            return string
+        else:
+            print("Either your password is wrong or the file is tampered")
+            quit()
+    except Exception:
+        print("Master file is tampered")
+        quit()
+
+def secure_read_master_file(masterfilename):
+    with open(masterfilename,"r") as masterfile:
+        # read base64 encoded cipher from file
+        encoded_cipher_string = unhashit(masterfile.read()) #unhash before decrypt
+        # convert base64 to bytes - cipher_binary
+        cipher_binary = base64.b64decode(encoded_cipher_string)
+        # decrypt using master password
+        return aes.decrypt(masterpassword,cipher_binary).decode() # decrypt returns bytes, so we convert to text
+
+def secure_write_master_file(content,masterfilename,conf=False):
+    # expecting text content as input
+
+    # checking hash of previous file and current json dump to check if the changes made is not working
+    # because every time the json dump creates a new hash no matter if edited or not
+    # possibly because python dictionary is not ordered, and it shuffles order everytime serialised via json.dumps
+    # so we currently dont do that here
+
+    if conf and not confirm("Do you want save the changes? (y/n) :"):
+        success("Changes NOT saved")
+        return False
+
+    # encrypt content using masterpassword
+    cipher_binary=aes.encrypt(masterpassword,content) #encrypt internally converts string to binary
+    # convert resultant binary to base64
+    encoded_cipher_string = base64.b64encode(cipher_binary).decode()
+    # write base64 to file
+    data_to_write=hashit(encoded_cipher_string)
+    
+    with open(masterfilename,"w") as masterfile:
+        masterfile.write(data_to_write) # add hash
+    success("Saved")
+    return True
+
+def take_backup():
+    if not os.path.exists("backup"):
+        os.makedirs("backup")
+    shutil.copyfile(masterfilename,"backup/%s.%s.backup"%(masterfilename,int(time.time())))
+    success("Data file backed up")
+
+def save(confirm=False):
+    master={"wp":welcomephrase,"ks":keystore}
+    if secure_write_master_file(json.dumps(master),masterfilename,confirm)==True:
+        # take backup only if actual disk write happens
+        take_backup()
 
 def choose_a_site():
     if keystore:
@@ -245,9 +321,7 @@ def show_a_site(option_number):
 lines=''
 try:
     if os.path.isfile(masterfilename):
-        with open(masterfilename,'r') as f:
-            for line in f:
-                lines+=line
+        lines=secure_read_master_file(masterfilename)
         if lines:
             master=json.loads(lines)
             welcomephrase=master['wp']
@@ -335,8 +409,10 @@ while(True):
     elif choice=='2':
         search_term = getdata("Search Term :")
         if keystore:
-            t=table(["Site Name","Field","Value"])
+            t=table(["S.no","Site Name","Field","Value"])
+            sno=0
             for site in keystore:
+                sno+=1
                 siteName = decrypt(site)
                 for i in keystore[site]:
                     for j in i:
@@ -344,7 +420,7 @@ while(True):
                         val = decrypt(i[j])
                         if var.lower().find(search_term)!=-1 or val.lower().find(search_term)!=-1 or siteName.lower().find(search_term)!=-1:
                             #print(siteName+">>\t"+var+":\t"+val)
-                            t.add_row([siteName,var,val])
+                            t.add_row([sno,siteName,var,val])
             if not t.print():
                 error("Search result empty")
         else:
@@ -480,15 +556,10 @@ while(True):
             error("Keystore is empty")
     elif choice=='8':
         save()
-        success("Saved")
     elif choice=='9':
-        save()
-        success("Changes saved")
-        break;
-    elif choice=='10':
-        success("changes NOT Saved")
+        save(confirm=True)
         break
-    elif choice=='11':
+    elif choice=='10':
         if keystore:
             with open(getdata("File name:"),"w") as f:
                 for s in keystore:
@@ -501,7 +572,7 @@ while(True):
             success("Data exported")
         else:
             error("Keystore is empty")
-    elif choice=='12':
+    elif choice=='11':
         print(bcolors.FAIL+"WARNING:"+bcolors.ENDC+bcolors.WARNING+"\nThis action will try to decrypt all data, with the master password which you keyed in as you logged in, and encrypt it with new master password"+bcolors.ENDC)
         print(bcolors.WARNING+"Hence if you had provided an incorrect master password, your entire data will be irrecoverably corrupted. So please double check if you have logged in with correct master password. you can do this by checking if you can see and recognize data of any site."+bcolors.ENDC)
         print(bcolors.WARNING+"This will also save all the changes made so far before changing the password, hence invalidating 'Dont save and exit' option."+bcolors.ENDC)
@@ -527,7 +598,7 @@ while(True):
                 error("Password mismatch")
         else:
             success("No changes made")
-    elif choice=='13':
+    elif choice=='12':
         nwp=encrypt(getdata("New welcome phrase :"))
         welcomephrase=nwp
         save()

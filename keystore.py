@@ -43,8 +43,14 @@ class table:
         print(string+"|")
     def get_chunks(self,x,max_length=None):
         max_length = max_length or self.max_length
-        chunks, chunk_size = len(x), max_length
-        return [ x[i:i+chunk_size] for i in range(0, chunks, chunk_size) ]
+        result=[]
+        for line in x.split("\n"):
+            if len(line)==0: #empty line in between lines
+                result+=[line]
+            else:
+                chunks, chunk_size = len(line), max_length
+                result+=[ line[i:i+chunk_size] for i in range(0, chunks, chunk_size) ]
+        return result
     def print_row(self,row):
         #rows=[[] for i in range(len(row)]
         rows=[]
@@ -56,10 +62,7 @@ class table:
             string=''
             for j in range(len(row)):
                 text = rows[j][i] if i<len(rows[j]) else ""
-                if i>0:
-                    string+=f"|{text:<{self.lengths[j]}}"
-                else:
-                    string+=f"|{text:^{self.lengths[j]}}"
+                string+=f"|{text:<{self.lengths[j]}}" #replace < with ^ for center align
             print(string+"|")
     def print_line(self):
         line=''
@@ -154,7 +157,18 @@ def showmenu(options=[],header=None):
         if int(ch)>=1 and int(ch)<=len(options):
             return ch
         error("Option not found")
-def getdata(prompt=">>",regex=None,default=None,message="Invalid option"):
+def get_multiline_data(prompt):
+    print(bcolors.OKBLUE+prompt+bcolors.ENDC)
+    print("Enter just Ctrl-D(mac) or Ctrl-Z(windows) IN A NEW SEPERATE LINE to enter and close it.")
+    contents = []
+    while True:
+        try:
+            line = input("line/ctrl+z >")
+        except EOFError:
+            break
+        contents.append(line)
+    return "\n".join(contents)
+def getdata(prompt=">>",regex=None,default=None,message="Invalid option",multiline=False):
     #If there is a value in regex, by default it means, this funtion expects a valid value from user.
     #Hence it will infinitely ask user to enter valid data. user cannot escape just by pressing enter.
     #If there is no regex given, All kind of input is acceptable including blank. hence user can just "press any key to continue" using this
@@ -162,7 +176,10 @@ def getdata(prompt=">>",regex=None,default=None,message="Invalid option"):
     errcount=0
     while(True):
         data=None
-        data=input(bcolors.OKBLUE+prompt+bcolors.ENDC)
+        if multiline==True:
+            data=get_multiline_data(prompt)
+        else:
+            data=input(bcolors.OKBLUE+prompt+bcolors.ENDC)
         if not data:
             if default:
                 return default
@@ -377,7 +394,7 @@ while(True):
                 if f in keystore[s][-1]:
                     error("This field already exists!")
                     continue
-                v=encrypt(getdata("Value: "))
+                v=encrypt(getdata("Value: ",multiline=True))
                 keystore[s][-1][f]=v
             success("Done")
         elif selection=='2':
@@ -401,7 +418,7 @@ while(True):
                 if f in keystore[s][-1]:
                     error("This field already exists!")
                     continue
-                v=encrypt(getdata("Value: "))
+                v=encrypt(getdata("Value: ",multiline=True))
                 keystore[s][-1][f]=v
             success("Done")
         else:
@@ -495,7 +512,7 @@ while(True):
                             if f in keystore[s][n-1]:
                                 error("This field already exists!")
                             else:
-                                v=encrypt(getdata("Value: "))
+                                v=encrypt(getdata("Value: ", multiline=True))
                                 keystore[s][n-1][f]=v
                                 success("New field added")
                         elif option=='2':
@@ -511,7 +528,7 @@ while(True):
                                 if f>0 and f<=len(keystore[s][n-1]):
                                     print("Old value for %s:%s"%(decrypt(list(keystore[s][n-1])[f-1]), decrypt(keystore[s][n-1][list(keystore[s][n-1])[f-1]])))
                                     if confirm("Are you sure to edit ? (y/n):"):
-                                        keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": "))
+                                        keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": ",multiline=True))
                                         success("Updated")
                                     else:
                                         error("Not edited")

@@ -283,7 +283,9 @@ def secure_write_master_file(content,masterfilename,conf=False):
 def take_backup():
     if not os.path.exists("backup"):
         os.makedirs("backup")
-    shutil.copyfile(masterfilename,"backup/%s.%s.backup"%(masterfilename,int(time.time())))
+    
+    change_description_oneliner = getdata(prompt="Change description one-liner for backup :",regex="[a-zA-Z0-9_\- ]*\Z",default="NoDescription",message="Invalid description. only alphabets, numbers, underscore and hyphen are allowed")
+    shutil.copyfile(masterfilename,"backup/%s.%s.%s.backup"%(masterfilename,int(time.time()),change_description_oneliner))
     success("Data file backed up")
 
 def save(confirm=False):

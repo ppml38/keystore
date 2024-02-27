@@ -102,12 +102,12 @@ class bcolors:
 
 hdr="----------------\n"+bcolors.OKGREEN+"K E Y  S T O R E"+bcolors.ENDC+"\n----------------"
 menu=[
-    "Store new site",
+    "Store new site/account",
     "Search",
     "Delete a site",
     "List all sites",
     "Delete all sites",
-    "Edit a site",
+    "Edit an account",
     "Reveal All sites",
     "Save",
     bcolors.FAIL+"EXIT"+bcolors.ENDC,
@@ -145,17 +145,21 @@ def error(msg):
     print(bcolors.FAIL+msg+bcolors.ENDC)
 def warning(msg):
     print(bcolors.WARNING+msg+bcolors.ENDC)
-def showmenu(options=[],header=None):
+def showmenu(options=[],header=None,showCancel=False):
     if header:
         print(bcolors.HEADER+header+bcolors.ENDC)
     count=1
     for i in options:
         print(bcolors.OKBLUE+str(count)+"."+bcolors.ENDC+str(i))
         count+=1
+    if showCancel==True:
+        print(bcolors.OKBLUE+str(count)+"."+bcolors.ENDC+bcolors.FAIL+"Cancel"+bcolors.ENDC)
     while True:
         ch=getdata(regex="\d+\Z")
         if int(ch)>=1 and int(ch)<=len(options):
             return ch
+        if showCancel==True and int(ch)==len(options)+1:
+            return None # user chose cancel
         error("Option not found")
 def get_multiline_data(prompt):
     print(bcolors.OKBLUE+prompt+bcolors.ENDC)
@@ -257,7 +261,7 @@ def secure_write_master_file(content,masterfilename,conf=False):
 
     # checking hash of previous file and current json dump to check if the changes made is not working
     # because every time the json dump creates a new hash no matter if edited or not
-    # possibly because python dictionary is not ordered, and it shuffles order everytime serialised via json.dumps
+    # possibly because, AES algorithm padding data with different random bytes every time
     # so we currently dont do that here
 
     if conf and not confirm("Do you want save the changes? (y/n) :"):
@@ -372,7 +376,7 @@ while(True):
     print(hdr)
     choice=showmenu(menu)
     if choice=='1':
-        selection=showmenu(options=["Create new site","Add new account to existing site"],header="What you want to do?")
+        selection=showmenu(options=["Create new site","Add new account to existing site"],header="What you want to do?",showCancel=True)
         if selection=='1':
             s=encrypt(getdata("Site : "))
             u=encrypt(getdata("Username/email : "))
@@ -421,7 +425,9 @@ while(True):
                 v=encrypt(getdata("Value: ",multiline=True))
                 keystore[s][-1][f]=v
             success("Done")
-        else:
+        elif selection==None: #user chose cancel
+            success("No changes made.")
+        else: # empty input also comes here
             error("Invalid option")
     elif choice=='2':
         search_term = getdata("Search Term :")
@@ -506,7 +512,7 @@ while(True):
                 try:
                     n=int(n)
                     if n>0 and n<=len(keystore[s]):
-                        option=showmenu(options=["Add a field","Edit existing field","Delete a field"],header="What you want to do?")
+                        option=showmenu(options=["Add a field","Edit existing field","Delete a field"],header="What you want to do?",showCancel=True)
                         if option=='1':
                             f=encrypt(getdata("Field : "))
                             if f in keystore[s][n-1]:
@@ -522,39 +528,47 @@ while(True):
                                 #print(str(cu)+"."+decrypt(i))
                                 #opts.append(decrypt(i))
                                 #cu+=1
-                            f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Please select the field to Edit (1-"+str(len(keystore[s][n-1]))+")?")
-                            try:
-                                f=int(f)
-                                if f>0 and f<=len(keystore[s][n-1]):
-                                    print("Old value for %s:%s"%(decrypt(list(keystore[s][n-1])[f-1]), decrypt(keystore[s][n-1][list(keystore[s][n-1])[f-1]])))
-                                    if confirm("Are you sure to edit ? (y/n):"):
-                                        keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": ",multiline=True))
-                                        success("Updated")
+                            f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Please select the field to Edit (1-"+str(len(keystore[s][n-1]))+")?",showCancel=True)
+                            if f!=None:
+                                try:
+                                    f=int(f)
+                                    if f>0 and f<=len(keystore[s][n-1]):
+                                        print("Old value for %s:%s"%(decrypt(list(keystore[s][n-1])[f-1]), decrypt(keystore[s][n-1][list(keystore[s][n-1])[f-1]])))
+                                        if confirm("Are you sure to edit ? (y/n):"):
+                                            keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": ",multiline=True))
+                                            success("Updated")
+                                        else:
+                                            error("Not edited")
                                     else:
-                                        error("Not edited")
-                                else:
+                                        error("Invalid option")
+                                except ValueError:
                                     error("Invalid option")
-                            except ValueError:
-                                error("Invalid option")
+                            else:
+                                success("No changes made")
 
                         elif option=='3':
                             #opts=[]
                             #for i in keystore[s][n-1]:
                                 #print(str(cu)+"."+decrypt(i))
                                 #opts.append(decrypt(i))
-                            f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Which field you want to Delete (1-"+str(len(keystore[s][n-1]))+")?")
-                            try:
-                                f=int(f)
-                                if f>0 and f<=len(keystore[s][n-1]):
-                                    if confirm("Are you sure to delete? (y/n):"):
-                                        del keystore[s][n-1][list(keystore[s][n-1])[f-1]]
-                                        success("Deleted")
+                            f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Which field you want to Delete (1-"+str(len(keystore[s][n-1]))+")?",showCancel=True)
+                            if f!=None:
+                                try:
+                                    f=int(f)
+                                    if f>0 and f<=len(keystore[s][n-1]):
+                                        if confirm("Are you sure to delete? (y/n):"):
+                                            del keystore[s][n-1][list(keystore[s][n-1])[f-1]]
+                                            success("Deleted")
+                                        else:
+                                            error("Nothing deleted")
                                     else:
-                                        error("Nothing deleted")
-                                else:
+                                        error("Invalid option")
+                                except ValueError:
                                     error("Invalid option")
-                            except ValueError:
-                                error("Invalid option")
+                            else:
+                                success("No changes made")
+                        elif option==None: #user chose cancel
+                            success("No changes made")
                         else:
                             error("Invalid option")
                         

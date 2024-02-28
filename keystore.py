@@ -18,10 +18,22 @@ import base64
 import hashlib
 import shutil
 import time
+import subprocess
+import sys
 
+
+def copy_to_clipboard(data):
+    command = "clip" # windows
+    if sys.platform.startswith("darwin"): #macos
+        command = "pbcopy" 
+    #linux not supported as there is no builtin module for copy afaik, it requires xclip to be installed
+
+    subprocess.run(command, text=True, input=data)
+    
 class table:
-    def __init__(self,header):
+    def __init__(self,header,fields_to_hide=[]):
         self.header = list(map(str,header))
+        self.fields_to_hide = fields_to_hide
         #self.lengths = list(map(len,header))
         self.max_length = 30
         self.lengths = []
@@ -51,12 +63,15 @@ class table:
                 chunks, chunk_size = len(line), max_length
                 result+=[ line[i:i+chunk_size] for i in range(0, chunks, chunk_size) ]
         return result
-    def print_row(self,row):
+    def print_row(self,row,row_number):
         #rows=[[] for i in range(len(row)]
         rows=[]
         max_height=0
-        for field in row:
-            rows.append(self.get_chunks(field))
+        for i,field in enumerate(row):
+            if i in self.fields_to_hide:
+                rows.append(["**** (%s.%s)"%(row_number,i)])
+            else:
+                rows.append(self.get_chunks(field))
             max_height=max(max_height,len(rows[-1]))
         for i in range(max_height):
             string=''
@@ -78,6 +93,26 @@ class table:
         chunks=self.get_chunks(self.title,total_length)
         for chunk in chunks:
             print(f"|{bcolors.OKGREEN}{chunk:^{total_length}}{bcolors.ENDC}|")
+    def show_reveal(self):
+        cell = getdata(prompt="Enter cell number to reveal/copy (empty to cancel) :",regex="(\d+\.\d+)?\Z",message="Invalid cell number")
+        if len(cell)==0:
+            return False
+        row,col=cell.split(".")
+        row,col=int(row),int(col)
+        if row<0 or row>=len(self.rows) or col<0 or col>=len(self.rows[0]):
+            error("Cell number not found")
+            return True
+        copy_or_reveal = getdata(prompt="Copy(c) or Reveal(r) :", regex="c|r\Z")
+        val = self.rows[row][col]
+        if copy_or_reveal=="r":
+            print(val)
+        elif copy_or_reveal=="c":
+            copy_to_clipboard(val)
+            success("Copied to clipboard")
+        else:
+            error("Invalid option")
+        return True
+            
     def print(self):
         if len(self.rows)==0:
             return False
@@ -85,9 +120,12 @@ class table:
         self.print_line()
         self.print_header()
         self.print_line()
-        for row in self.rows:
-            self.print_row(row)
+        for i,row in enumerate(self.rows):
+            self.print_row(row,i)
             self.print_line()
+        if len(self.fields_to_hide)!=0:
+            while self.show_reveal(): # continue as long as user not enter empty string
+                pass
         return True
 class bcolors:
     HEADER = '\033[95m'
@@ -316,13 +354,13 @@ def choose_a_site():
     else:
         error("Keystore is empty")
         return {'sitename':None,'option':None}
-def show_a_site(option_number):
+def show_a_site(option_number,hide_values=False):
     if option_number==None:
         return
     c=1
     for i in keystore:
         if c==option_number:
-            t=table(["S.No","Field","Value"])
+            t=table(["S.No","Field","Value"],fields_to_hide=[2] if hide_values else [])
             t.add_title(decrypt(i))
             all_records=keystore[i] #a site can have multiple records, ex. having multiple twitter accounts
             for index in range(len(all_records)):
@@ -434,7 +472,7 @@ while(True):
     elif choice=='2':
         search_term = getdata("Search Term :")
         if keystore:
-            t=table(["S.no","Site Name","Field","Value"])
+            t=table(["S.no","Site Name","Field","Value"],fields_to_hide=[3])
             sno=0
             for site in keystore:
                 sno+=1
@@ -452,7 +490,7 @@ while(True):
             error("Keystore is empty")
     elif choice=='3':
         site_input = choose_a_site()
-        show_a_site(site_input['option'])
+        show_a_site(site_input['option'],hide_values=True)
         if site_input['sitename']==None:
             error("No site deleted")
         elif confirm("Is this the site you want to delete ? (y/n):") and confirm("Are you sure to delete '%s' ? (y/n):"%decrypt(site_input['sitename'])):
@@ -487,7 +525,7 @@ while(True):
         if keystore:
             choice = choose_a_site()['option']
             if choice!=None:
-                show_a_site(choice)
+                show_a_site(choice,hide_values=True)
         else:
             error("Keystore is empty")
     elif choice=='5':
@@ -495,7 +533,7 @@ while(True):
         error("This option is deprecated.")
     elif choice=='6':
         site_input = choose_a_site()
-        show_a_site(site_input['option'])
+        show_a_site(site_input['option'],hide_values=True)
         if site_input['sitename']==None:
             error("No site edited")
         elif confirm("Is this the site you want to edit ? (y/n):"):

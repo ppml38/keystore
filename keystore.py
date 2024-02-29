@@ -94,19 +94,23 @@ class table:
         for chunk in chunks:
             print(f"|{bcolors.OKGREEN}{chunk:^{total_length}}{bcolors.ENDC}|")
     def show_reveal(self):
-        cell = getdata(prompt="Enter cell number to reveal/copy (empty to cancel) :",regex="(\d+\.\d+)?\Z",message="Invalid cell number")
+        cell = getdata(prompt="Enter cell number to reveal/copy or 'unsecure' to reveal all or leave empty to cancel\n>>",regex="(\d+\.\d+|unsecure)?\Z",message="Invalid cell number")
         if len(cell)==0:
+            return False
+        if cell=="unsecure":
+            self.fields_to_hide=[]
+            self.print()
             return False
         row,col=cell.split(".")
         row,col=int(row),int(col)
         if row<0 or row>=len(self.rows) or col<0 or col>=len(self.rows[0]):
             error("Cell number not found")
             return True
-        copy_or_reveal = getdata(prompt="Copy(c) or Reveal(r) :", regex="c|r\Z")
+        copy_or_reveal = getdata(prompt="Enter empty to Copy or r to reveal :", regex="r?\Z")
         val = self.rows[row][col]
         if copy_or_reveal=="r":
             print(val)
-        elif copy_or_reveal=="c":
+        elif len(copy_or_reveal)==0:
             copy_to_clipboard(val)
             success("Copied to clipboard")
         else:
@@ -124,7 +128,7 @@ class table:
             self.print_row(row,i)
             self.print_line()
         if len(self.fields_to_hide)!=0:
-            while self.show_reveal(): # continue as long as user not enter empty string
+            while self.show_reveal(): # continue as long as user not enter empty string or reveal all
                 pass
         return True
 class bcolors:

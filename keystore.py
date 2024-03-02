@@ -29,6 +29,11 @@ def copy_to_clipboard(data):
     #linux not supported as there is no builtin module for copy afaik, it requires xclip to be installed
 
     subprocess.run(command, text=True, input=data)
+
+def clear_clipboard():
+    #os.system("echo off|clip")
+    copy_to_clipboard("")
+    success("Clipboard cleared")
     
 class table:
     def __init__(self,header,fields_to_hide=[]):
@@ -146,11 +151,9 @@ hdr="----------------\n"+bcolors.OKGREEN+"K E Y  S T O R E"+bcolors.ENDC+"\n----
 menu=[
     "Store new site/account",
     "Search",
-    "Delete a site",
+    "Delete a site/account",
     "List all sites",
-    "Delete all sites",
     "Edit an account",
-    "Reveal All sites",
     "Save",
     bcolors.FAIL+"EXIT"+bcolors.ENDC,
     "Export plain data",
@@ -204,12 +207,12 @@ def showmenu(options=[],header=None,showCancel=False):
             return None # user chose cancel
         error("Option not found")
 def get_multiline_data(prompt):
-    print(bcolors.OKBLUE+prompt+bcolors.ENDC)
-    print("Enter just Ctrl-D(mac) or Ctrl-Z(windows) IN A NEW SEPERATE LINE to enter and close it.")
+    print(bcolors.OKBLUE+prompt+" Add in below multiline editor"+bcolors.ENDC)
+    print(bcolors.OKBLUE+"Enter just Ctrl-D(mac) or Ctrl-Z(windows) IN A NEW SEPERATE LINE to enter and close it."+bcolors.ENDC)
     contents = []
     while True:
         try:
-            line = input("line/ctrl+z >")
+            line = input(bcolors.OKBLUE+"line/ctrl+z >"+bcolors.ENDC)
         except EOFError:
             break
         contents.append(line)
@@ -497,19 +500,15 @@ while(True):
         show_a_site(site_input['option'],hide_values=True)
         if site_input['sitename']==None:
             error("No site deleted")
-        elif confirm("Is this the site you want to delete ? (y/n):") and confirm("Are you sure to delete '%s' ? (y/n):"%decrypt(site_input['sitename'])):
+        elif confirm("Is '%s' the correct site ? (y/n):"%decrypt(site_input['sitename'])):
             s=site_input['sitename']
             if s in keystore:
                 if len(keystore[s])>1:
-                    c=1
-                    for i in keystore[s]:
-                        print("("+str(c)+")")
-                        for j in i:
-                            print(decrypt(j)+"\t"+decrypt(i[j]))
-                        c+=1
-                    n=getdata(prompt="Please select the record to delete (1-"+str(len(keystore[s]))+") or enter 'A' to delete all records: ",regex="a|A|\d+\Z",message="Invalid option")
+                    n=getdata(prompt="Please select the record to delete (1-"+str(len(keystore[s]))+") or enter 'A' to delete entire site or empty to cancel: ",regex="(a|A|\d+)?\Z",message="Invalid option")
                     if n in ['a','A']:
                         del keystore[s]
+                    elif len(n)==0:
+                        success("No site deleted.")
                     else:
                         try:
                             n=int(n)
@@ -533,9 +532,6 @@ while(True):
         else:
             error("Keystore is empty")
     elif choice=='5':
-        #keystore={}
-        error("This option is deprecated.")
-    elif choice=='6':
         site_input = choose_a_site()
         show_a_site(site_input['option'],hide_values=True)
         if site_input['sitename']==None:
@@ -543,98 +539,79 @@ while(True):
         elif confirm("Is this the site you want to edit ? (y/n):"):
             s=site_input['sitename']
             if s in keystore:
+                n="1"
                 if len(keystore[s])>1:
-                    c=1
-                    for i in keystore[s]:
-                        print("("+str(c)+")")
-                        for j in i:
-                            print(decrypt(j)+"\t"+decrypt(i[j]))
-                        c+=1
-                    n=getdata(prompt="Please select the record to Edit (1-"+str(len(keystore[s]))+"): ",regex="\d+\Z")
-                else:
-                    n=1        
-                try:
-                    n=int(n)
-                    if n>0 and n<=len(keystore[s]):
-                        option=showmenu(options=["Add a field","Edit existing field","Delete a field"],header="What you want to do?",showCancel=True)
-                        if option=='1':
-                            f=encrypt(getdata("Field : "))
-                            if f in keystore[s][n-1]:
-                                error("This field already exists!")
-                            else:
-                                v=encrypt(getdata("Value: ", multiline=True))
-                                keystore[s][n-1][f]=v
-                                success("New field added")
-                        elif option=='2':
-                            #print("\n")
-                            #opts=[]
-                            #for i in keystore[s][n-1]:
-                                #print(str(cu)+"."+decrypt(i))
-                                #opts.append(decrypt(i))
-                                #cu+=1
-                            f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Please select the field to Edit (1-"+str(len(keystore[s][n-1]))+")?",showCancel=True)
-                            if f!=None:
-                                try:
-                                    f=int(f)
-                                    if f>0 and f<=len(keystore[s][n-1]):
-                                        print("Old value for %s:%s"%(decrypt(list(keystore[s][n-1])[f-1]), decrypt(keystore[s][n-1][list(keystore[s][n-1])[f-1]])))
-                                        if confirm("Are you sure to edit ? (y/n):"):
-                                            keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": ",multiline=True))
-                                            success("Updated")
+                    n=getdata(prompt="Please select the account to Edit (1-"+str(len(keystore[s]))+") or empty to cancel: ",regex="(\d+)?\Z")
+                if len(n)!=0:
+                    try:
+                        n=int(n)
+                        if n>0 and n<=len(keystore[s]):
+                            option=showmenu(options=["Add a field","Edit existing field","Delete a field"],header="What you want to do?",showCancel=True)
+                            if option=='1':
+                                f=encrypt(getdata("Field : "))
+                                if f in keystore[s][n-1]:
+                                    error("This field already exists!")
+                                else:
+                                    v=encrypt(getdata("Value: ", multiline=True))
+                                    keystore[s][n-1][f]=v
+                                    success("New field added")
+                            elif option=='2':
+                                f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Please select the field to Edit (1-"+str(len(keystore[s][n-1]))+")?",showCancel=True)
+                                if f!=None:
+                                    try:
+                                        f=int(f)
+                                        if f>0 and f<=len(keystore[s][n-1]):
+                                            print("Old value for %s:%s"%(decrypt(list(keystore[s][n-1])[f-1]), decrypt(keystore[s][n-1][list(keystore[s][n-1])[f-1]])))
+                                            if confirm("Are you sure to edit ? (y/n):"):
+                                                keystore[s][n-1][list(keystore[s][n-1])[f-1]]=encrypt(getdata("New Value for "+decrypt(list(keystore[s][n-1])[f-1])+": ",multiline=True))
+                                                success("Updated")
+                                            else:
+                                                error("Not edited")
                                         else:
-                                            error("Not edited")
-                                    else:
+                                            error("Invalid option")
+                                    except ValueError:
                                         error("Invalid option")
-                                except ValueError:
-                                    error("Invalid option")
-                            else:
-                                success("No changes made")
+                                else:
+                                    success("No changes made")
 
-                        elif option=='3':
-                            #opts=[]
-                            #for i in keystore[s][n-1]:
-                                #print(str(cu)+"."+decrypt(i))
-                                #opts.append(decrypt(i))
-                            f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Which field you want to Delete (1-"+str(len(keystore[s][n-1]))+")?",showCancel=True)
-                            if f!=None:
-                                try:
-                                    f=int(f)
-                                    if f>0 and f<=len(keystore[s][n-1]):
-                                        if confirm("Are you sure to delete? (y/n):"):
-                                            del keystore[s][n-1][list(keystore[s][n-1])[f-1]]
-                                            success("Deleted")
+                            elif option=='3':
+                                f=showmenu(options=list(map(decrypt,keystore[s][n-1])),header="Which field you want to Delete (1-"+str(len(keystore[s][n-1]))+")?",showCancel=True)
+                                if f!=None:
+                                    try:
+                                        f=int(f)
+                                        if f>0 and f<=len(keystore[s][n-1]):
+                                            if confirm("Are you sure to delete? (y/n):"):
+                                                del keystore[s][n-1][list(keystore[s][n-1])[f-1]]
+                                                success("Deleted")
+                                            else:
+                                                error("Nothing deleted")
                                         else:
-                                            error("Nothing deleted")
-                                    else:
+                                            error("Invalid option")
+                                    except ValueError:
                                         error("Invalid option")
-                                except ValueError:
-                                    error("Invalid option")
-                            else:
+                                else:
+                                    success("No changes made")
+                            elif option==None: #user chose cancel
                                 success("No changes made")
-                        elif option==None: #user chose cancel
-                            success("No changes made")
+                            else:
+                                error("Invalid option")
                         else:
-                            error("Invalid option")
-                        
-                except ValueError:
-                    error("Please enter valid option")
+                            error("Invalid account number")
+                    except ValueError:
+                        error("Please enter valid option")
+                else:
+                    error("No site edited")
             else:
                 error(decrypt(s)+" not found")
         else:
             error("No site edited")
-    elif choice=='7':
-        if keystore:
-            for i in range(len(keystore)):
-                print("(%s)"%(i+1))
-                show_a_site(i+1)
-        else:
-            error("Keystore is empty")
-    elif choice=='8':
+    elif choice=='6':
         save()
-    elif choice=='9':
+    elif choice=='7':
         save(confirm=True)
+        clear_clipboard()
         break
-    elif choice=='10':
+    elif choice=='8':
         if keystore:
             with open(getdata("File name:"),"w") as f:
                 for s in keystore:
@@ -647,7 +624,7 @@ while(True):
             success("Data exported")
         else:
             error("Keystore is empty")
-    elif choice=='11':
+    elif choice=='9':
         print(bcolors.FAIL+"WARNING:"+bcolors.ENDC+bcolors.WARNING+"\nThis action will try to decrypt all data, with the master password which you keyed in as you logged in, and encrypt it with new master password"+bcolors.ENDC)
         print(bcolors.WARNING+"Hence if you had provided an incorrect master password, your entire data will be irrecoverably corrupted. So please double check if you have logged in with correct master password. you can do this by checking if you can see and recognize data of any site."+bcolors.ENDC)
         print(bcolors.WARNING+"This will also save all the changes made so far before changing the password, hence invalidating 'Dont save and exit' option."+bcolors.ENDC)
@@ -673,7 +650,7 @@ while(True):
                 error("Password mismatch")
         else:
             success("No changes made")
-    elif choice=='12':
+    elif choice=='10':
         nwp=encrypt(getdata("New welcome phrase :"))
         welcomephrase=nwp
         save()

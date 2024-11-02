@@ -99,7 +99,7 @@ class table:
         for chunk in chunks:
             print(f"|{bcolors.OKGREEN}{chunk:^{total_length}}{bcolors.ENDC}|")
     def show_reveal(self):
-        cell = getdata(prompt="Enter cell number to reveal/copy or 'unsecure' to reveal all or leave empty to cancel\n>>",regex="(\d+\.\d+|unsecure)?\Z",message="Invalid cell number")
+        cell = getdata(prompt="Enter cell number to reveal/copy or 'unsecure' to reveal all or leave empty to cancel\n>>",regex=r"(\d+\.\d+|unsecure)?\Z",message="Invalid cell number")
         if len(cell)==0:
             return False
         if cell=="unsecure":
@@ -111,7 +111,7 @@ class table:
         if row<0 or row>=len(self.rows) or col<0 or col>=len(self.rows[0]):
             error("Cell number not found")
             return True
-        copy_or_reveal = getdata(prompt="Enter empty to Copy or r to reveal :", regex="r?\Z")
+        copy_or_reveal = getdata(prompt="Enter empty to Copy or r to reveal :", regex=r"r?\Z")
         val = self.rows[row][col]
         if copy_or_reveal=="r":
             print(val)
@@ -169,7 +169,7 @@ keystore={}
 
 def generatepwd(length=32,caps=True,small=True,numbers=True,specials=True,request=False):
     if request:
-        length=int(getdata(prompt="Password length :",regex="\d+\Z",default=32,message="Invalid length"))
+        length=int(getdata(prompt="Password length :",regex=r"\d+\Z",default=32,message="Invalid length"))
         caps=confirm("Do you want to include capital letters(y/n) :")
         small=confirm("Do you want to include small letters(y/n) :")
         numbers=confirm("Do you want to include numbers(y/n) :")
@@ -200,7 +200,7 @@ def showmenu(options=[],header=None,showCancel=False):
     if showCancel==True:
         print(bcolors.OKBLUE+str(count)+"."+bcolors.ENDC+bcolors.FAIL+"Cancel"+bcolors.ENDC)
     while True:
-        ch=getdata(regex="\d+\Z")
+        ch=getdata(regex=r"\d+\Z")
         if int(ch)>=1 and int(ch)<=len(options):
             return ch
         if showCancel==True and int(ch)==len(options)+1:
@@ -329,7 +329,7 @@ def take_backup():
     if not os.path.exists("backup"):
         os.makedirs("backup")
     
-    change_description_oneliner = getdata(prompt="Change description one-liner for backup :",regex="[a-zA-Z0-9_\- ]*\Z",default="NoDescription",message="Invalid description. only alphabets, numbers, underscore and hyphen are allowed")
+    change_description_oneliner = getdata(prompt="Change description one-liner for backup :",regex=r"[a-zA-Z0-9_\- ]*\Z",default="NoDescription",message="Invalid description. only alphabets, numbers, underscore and hyphen are allowed")
     shutil.copyfile(masterfilename,"backup/%s.%s.%s.backup"%(masterfilename,int(time.time()),change_description_oneliner))
     success("Data file backed up")
 
@@ -504,7 +504,7 @@ while(True):
             s=site_input['sitename']
             if s in keystore:
                 if len(keystore[s])>1:
-                    n=getdata(prompt="Please select the record to delete (1-"+str(len(keystore[s]))+") or enter 'A' to delete entire site or empty to cancel: ",regex="(a|A|\d+)?\Z",message="Invalid option")
+                    n=getdata(prompt="Please select the record to delete (1-"+str(len(keystore[s]))+") or enter 'A' to delete entire site or empty to cancel: ",regex=r"(a|A|\d+)?\Z",message="Invalid option")
                     if n in ['a','A']:
                         del keystore[s]
                     elif len(n)==0:
@@ -541,7 +541,7 @@ while(True):
             if s in keystore:
                 n="1"
                 if len(keystore[s])>1:
-                    n=getdata(prompt="Please select the account to Edit (1-"+str(len(keystore[s]))+") or empty to cancel: ",regex="(\d+)?\Z")
+                    n=getdata(prompt="Please select the account to Edit (1-"+str(len(keystore[s]))+") or empty to cancel: ",regex=r"(\d+)?\Z")
                 if len(n)!=0:
                     try:
                         n=int(n)
